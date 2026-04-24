@@ -36,7 +36,7 @@ const inLibrary = computed(() => route.path.startsWith('/libraries/'))
         <span class="material-symbols-outlined">{{ sidebarOpen ? 'menu_open' : 'menu' }}</span>
       </button>
 
-      <span class="brand">PixelShare</span>
+      <span class="brand">PixelShare (Demo only)</span>
 
       <nav class="header-nav">
         <NuxtLink to="/" class="nav-btn" active-class="nav-btn--active">Libraries</NuxtLink>
