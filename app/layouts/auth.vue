@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { isDark, toggle: toggleDark } = useColorMode()
+const year = new Date().getFullYear()
 </script>
 
 <template>
@@ -29,7 +30,7 @@ const { isDark, toggle: toggleDark } = useColorMode()
 
       <!-- Footer -->
       <p class="auth-footer">
-        © 2024 PixelShare · <a href="#" class="footer-link">Privacy</a> · <a href="#" class="footer-link">Terms</a>
+        © {{ year }} PixelShare · <a href="#" class="footer-link">Privacy</a> · <a href="#" class="footer-link">Terms</a>
       </p>
     </div>
   </div>
