@@ -52,4 +52,4 @@ jobs:
             docker pull ghcr.io/6im0n/pixelshare-web:latest
             cd /home/pixelshare/frontend
             git pull origin main
-            NUXT_PUBLIC_API_BASE=https://pixelshare.srv.simon-gl.fr/ docker compose -f docker-compose.prod.yml up -d
+            NUXT_PUBLIC_API_BASE=${{ secrets.NUXT_PUBLIC_API_BASE }} docker compose -f docker-compose.prod.yml up -d
