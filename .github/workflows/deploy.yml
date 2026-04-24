@@ -51,4 +51,5 @@ jobs:
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u 6im0n --password-stdin
             docker pull ghcr.io/6im0n/pixelshare-web:latest
             cd /home/pixelshare/frontend
+            git pull origin main
             NUXT_PUBLIC_API_BASE=https://pixelshare.srv.simon-gl.fr/ docker compose -f docker-compose.prod.yml up -d

@@ -5,4 +5,4 @@ services:
     environment:
       NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE}
     ports:
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
