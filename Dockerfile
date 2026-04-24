@@ -7,7 +7,7 @@ RUN bun install --frozen-lockfile --ignore-scripts
 
 COPY . .
 
-RUN bun --bun run build
+RUN NODE_OPTIONS="--max-old-space-size=2560" bun --bun run build
 
 FROM oven/bun:1 AS production
 WORKDIR /app
