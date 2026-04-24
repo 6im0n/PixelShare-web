@@ -1,10 +1,8 @@
 services:
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/6im0n/pixelshare-web:latest
     restart: unless-stopped
     environment:
       NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE}
     ports:
-      - "127.0.0.1:80:80"
+      - "127.0.0.1:80:3000"
