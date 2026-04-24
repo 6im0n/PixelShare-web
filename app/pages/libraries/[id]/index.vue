@@ -55,6 +55,17 @@ function openLightbox(photoId: string) {
 }
 function closeLightbox() { lightboxPhotoId.value = null }
 
+function navigateLightbox(dir: 1 | -1) {
+  const list = filteredPhotos.value
+  if (!list.length || !lightboxPhotoId.value) return
+  const idx = list.findIndex(p => p.id === lightboxPhotoId.value)
+  if (idx === -1) return
+  const nextIdx = (idx + dir + list.length) % list.length
+  const nextId = list[nextIdx]!.id
+  lightboxPhotoId.value = nextId
+  markViewed(nextId)
+}
+
 function handleSetStars(id: string, stars: number) {
   setStars(id, stars)
   markViewed(id) // starring also counts as viewed
@@ -353,6 +364,8 @@ async function handleInviteMember(payload: InvitedMember) {
       :history="lightboxHistory"
       @close="closeLightbox"
       @set-stars="handleSetStars"
+      @next="navigateLightbox(1)"
+      @prev="navigateLightbox(-1)"
     />
   </Transition>
 </template>

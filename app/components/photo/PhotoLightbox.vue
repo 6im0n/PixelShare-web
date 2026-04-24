@@ -9,6 +9,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   setStars: [id: string, stars: number]
+  next: []
+  prev: []
 }>()
 
 // ── Local state ───────────────────────────────────────────────────────────
@@ -43,6 +45,9 @@ function onKey(e: KeyboardEvent) {
   }
   if (e.key === 'h') historyOpen.value = !historyOpen.value
   if (e.key === 'z') isZoomed.value = !isZoomed.value
+  if (isZoomed.value) return
+  if (e.key === 'ArrowRight') emit('next')
+  if (e.key === 'ArrowLeft') emit('prev')
 }
 
 // ── Zoom ──────────────────────────────────────────────────────────────────
@@ -210,7 +215,7 @@ const sortedHistory = computed(() => [...props.history].reverse())
         >
           <img
             ref="imgRef"
-            :src="photo.thumbnailUrl"
+            :src="photo.originalUrl"
             :alt="photo.filename"
             class="photo-img"
             :class="isZoomed ? 'photo-img--zoomed' : ''"

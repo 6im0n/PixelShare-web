@@ -23,6 +23,11 @@ function handleDelete(e: Event) {
 
 const isMutual = computed(() => props.photo.photographerStars > 0 && props.photo.myStars > 0)
 const isUnread = computed(() => props.photo.isNew && !isViewed(props.photo.id))
+const isLandscape = computed(() => {
+  const w = props.photo.width
+  const h = props.photo.height
+  return !!w && !!h && w > h
+})
 
 // Current user's own rating — photographer rates too (their rating == photographerStars).
 const topStars = computed(() => props.photo.myStars)
@@ -36,8 +41,9 @@ function handleSetStars(stars: number) {
   <div
     class="masonry-item card group"
     :class="[
-      isMutual  ? 'card--mutual'  : '',
-      isUnread  ? 'card--unread'  : '',
+      isMutual    ? 'card--mutual'    : '',
+      isUnread    ? 'card--unread'    : '',
+      isLandscape ? 'masonry-item--wide' : '',
     ]"
   >
 

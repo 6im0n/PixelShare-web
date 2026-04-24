@@ -2,8 +2,16 @@
 definePageMeta({ layout: 'auth', auth: false })
 
 const { getSession } = useAuth()
-const tokenCookie = useCookie('auth.token')
-const refreshTokenCookie = useCookie('auth.refresh-token')
+const tokenCookie = useCookie('auth.token', {
+  path: '/',
+  sameSite: 'lax',
+  maxAge: 900,
+})
+const refreshTokenCookie = useCookie('auth.refresh-token', {
+  path: '/',
+  sameSite: 'lax',
+  maxAge: 2592000,
+})
 const error = ref<string | null>(null)
 
 onMounted(async () => {
@@ -18,8 +26,7 @@ onMounted(async () => {
   tokenCookie.value = accessToken
   refreshTokenCookie.value = rt
   window.history.replaceState({}, '', '/oauth/callback')
-  await getSession()
-  await navigateTo('/')
+  window.location.assign('/')
 })
 </script>
 
