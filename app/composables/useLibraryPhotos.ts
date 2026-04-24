@@ -31,6 +31,8 @@ export interface LibraryPhoto {
   originalUrl: string
   fileSize: string
   fileType: string
+  width: number | null
+  height: number | null
   photographerStars: number
   myStars: number
   isNew: boolean
@@ -97,6 +99,8 @@ export function useLibraryPhotos(libraryId: string) {
           originalUrl: api.authedUrl(`/photos/${p.id}/original`),
           fileSize: humanSize(p.byteSize),
           fileType: fileTypeFromName(p.name),
+          width: p.width,
+          height: p.height,
           photographerStars: s.photographer,
           myStars: s.mine,
           isNew: false,
@@ -181,9 +185,8 @@ export function useLibraryPhotos(libraryId: string) {
   }
 
   async function submitSelection() {
-    console.log(
-      '[PixelShare] Submitting selection:',
-      starredPhotos.value.map((p) => ({ id: p.id, stars: p.myStars })),
+    return api.post<{ notified: number; selectedCount?: number; totalCount?: number }>(
+      `/libraries/${libraryId}/submit-selection`,
     )
   }
 
