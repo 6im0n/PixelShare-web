@@ -32,6 +32,12 @@ const isLandscape = computed(() => {
 // Current user's own rating — photographer rates too (their rating == photographerStars).
 const topStars = computed(() => props.photo.myStars)
 
+// Top badge: photographer views see model stars; everyone else sees photographer stars.
+const topBadgeStars = computed(() =>
+  isPhotographer.value ? props.photo.modelStars : props.photo.photographerStars,
+)
+const topBadgeLabel = computed(() => (isPhotographer.value ? 'Model' : 'Photographer'))
+
 function handleSetStars(stars: number) {
   emit('setStars', props.photo.id, stars)
 }
@@ -69,19 +75,19 @@ function handleSetStars(stars: number) {
         </div>
       </Transition>
 
-      <!-- Photographer badge -->
+      <!-- Top badge: photographer sees model stars, model sees photographer stars -->
       <Transition name="fade">
-        <div v-if="showPhotographerStars && photo.photographerStars > 0" class="photographer-badge">
+        <div v-if="showPhotographerStars && topBadgeStars > 0" class="photographer-badge">
           <div class="badge-inner">
             <div class="badge-stars">
               <span
                 v-for="s in 5" :key="s"
                 class="material-symbols-outlined"
-                :class="s <= photo.photographerStars ? 'filled-icon text-amber-400' : 'text-white/25'"
+                :class="s <= topBadgeStars ? 'filled-icon text-amber-400' : 'text-white/25'"
                 style="font-size:10px"
               >star</span>
             </div>
-            <span class="badge-label">Photographer</span>
+            <span class="badge-label">{{ topBadgeLabel }}</span>
           </div>
         </div>
       </Transition>
