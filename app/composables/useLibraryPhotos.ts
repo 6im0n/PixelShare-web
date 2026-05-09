@@ -34,6 +34,7 @@ export interface LibraryPhoto {
   width: number | null
   height: number | null
   photographerStars: number
+  modelStars: number
   myStars: number
   isNew: boolean
   uploadedAt: number
@@ -82,16 +83,17 @@ export function useLibraryPhotos(libraryId: string) {
 
       const { data: authData } = useAuth()
       const uid = authData.value?.id
-      const starsByPhoto = new Map<string, { photographer: number; mine: number }>()
+      const starsByPhoto = new Map<string, { photographer: number; model: number; mine: number }>()
       for (const r of _libStars) {
-        const cur = starsByPhoto.get(r.photoId) ?? { photographer: 0, mine: 0 }
+        const cur = starsByPhoto.get(r.photoId) ?? { photographer: 0, model: 0, mine: 0 }
         if (r.userRole === 'photographer' || r.userRole === 'admin') cur.photographer = r.value
+        if (r.userRole === 'client') cur.model = Math.max(cur.model, r.value)
         if (r.userId === uid) cur.mine = r.value
         starsByPhoto.set(r.photoId, cur)
       }
 
       photos.value = list.map((p) => {
-        const s = starsByPhoto.get(p.id) ?? { photographer: 0, mine: 0 }
+        const s = starsByPhoto.get(p.id) ?? { photographer: 0, model: 0, mine: 0 }
         return {
           id: p.id,
           filename: p.name,
@@ -102,6 +104,7 @@ export function useLibraryPhotos(libraryId: string) {
           width: p.width,
           height: p.height,
           photographerStars: s.photographer,
+          modelStars: s.model,
           myStars: s.mine,
           isNew: false,
           uploadedAt: new Date(p.uploadedAt).getTime(),
