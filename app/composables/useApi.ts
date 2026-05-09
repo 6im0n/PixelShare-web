@@ -46,11 +46,13 @@ export function useApi() {
     patch:  <T>(path: string, body?: ReqBody, opts?: Omit<ReqOpts, 'method' | 'body'>) => request<T>(path, { ...opts, method: 'PATCH', body }),
     put:    <T>(path: string, body?: ReqBody, opts?: Omit<ReqOpts, 'method' | 'body'>) => request<T>(path, { ...opts, method: 'PUT', body }),
     delete: <T>(path: string, opts?: Omit<ReqOpts, 'method' | 'body'>) => request<T>(path, { ...opts, method: 'DELETE' }),
-    authedUrl(path: string): string {
-      const url = new URL(`${base}/api${path}`)
+    async getBlob(path: string): Promise<Blob> {
       const t = token.value
-      if (t) url.searchParams.set('access_token', t.replace(/^Bearer\s+/i, ''))
-      return url.toString()
+      const res = await fetch(`${base}/api${path}`, {
+        headers: t ? { authorization: t } : undefined,
+      })
+      if (!res.ok) throw new Error(`Fetch failed (${res.status})`)
+      return res.blob()
     },
   }
 }
