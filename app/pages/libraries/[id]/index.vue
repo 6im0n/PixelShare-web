@@ -6,7 +6,7 @@ definePageMeta({ layout: 'library' })
 const route = useRoute()
 const libraryId = route.params.id as string
 
-const { photos, starredPhotos, totalCount, pendingCount, setStars, getPhotoHistory, submitSelection, uploadPhoto, clearMyStars, deletePhoto } = useLibraryPhotos(libraryId)
+const { photos, starredPhotos, totalCount, pendingCount, setStars, getPhotoHistory, submitSelection, uploadPhoto, clearMyStars, deletePhoto, fetchPhotos } = useLibraryPhotos(libraryId)
 const { markViewed, isViewed } = useViewedPhotos()
 const { filterStars, filterNewOnly, filterUnstarred, filterName, sortBy, sortDir, hasActiveFilters, clearAll: clearFilters } = useLibraryFilters()
 
@@ -139,12 +139,40 @@ async function doUpload(files: File[]) {
 }
 
 // ── Library meta ──────────────────────────────────────────────────────────
-const { get: getLibrary } = useLibraries()
+const { get: getLibrary, listClients, revokeClient } = useLibraries()
+const members = ref<Array<{ id: string; email: string; name: string }>>([])
+
+async function loadMembers() {
+  try {
+    members.value = await listClients(libraryId)
+  } catch {
+    members.value = []
+  }
+}
+
+async function handleRemoveMember(id: string, name: string) {
+  if (!confirm(`Remove ${name} from this collection? Their stars on these photos will be cleared.`)) return
+  try {
+    const res = await revokeClient(libraryId, id)
+    members.value = members.value.filter(m => m.id !== id)
+    await fetchPhotos()
+    const cleared = res?.clearedStars ?? 0
+    addMemberFeedback.value = {
+      kind: 'success',
+      text: cleared > 0
+        ? `${name} removed. ${cleared} star${cleared !== 1 ? 's' : ''} cleared.`
+        : `${name} removed.`,
+    }
+  } catch (err: unknown) {
+    addMemberFeedback.value = { kind: 'error', text: err instanceof Error ? err.message : 'Could not remove member.' }
+  }
+}
 const library = ref<{ name: string; description: string }>({
   name: 'Loading…',
   description: '',
 })
 if (import.meta.client) {
+  loadMembers()
   getLibrary(libraryId)
     .then((lib) => {
       library.value = {
@@ -170,6 +198,7 @@ async function handlePickMember(payload: PickedMember) {
     await addMember(libraryId, { userId: payload.userId, name: payload.name, readyToShare: false })
     addMemberFeedback.value = { kind: 'success', text: `${payload.name} added to the collection.` }
     showAddMember.value = false
+    await loadMembers()
   } catch (err: unknown) {
     addMemberFeedback.value = { kind: 'error', text: err instanceof Error ? err.message : 'Could not add member.' }
   }
@@ -275,6 +304,27 @@ async function handleInviteMember(payload: InvitedMember) {
       >
         Add a model
       </UiButton>
+
+      <div v-if="isPhotographer" class="members-field" aria-label="Models in this collection">
+        <span class="members-label">
+          <span class="material-symbols-outlined" style="font-size:14px">groups</span>
+          Models
+        </span>
+        <ul v-if="members.length > 0" class="members-list">
+          <li v-for="m in members" :key="m.id" class="member-chip" :title="m.email">
+            <span class="member-name">{{ m.name || m.email }}</span>
+            <button
+              type="button"
+              class="member-remove"
+              :aria-label="`Remove ${m.name || m.email}`"
+              @click="handleRemoveMember(m.id, m.name || m.email)"
+            >
+              <span class="material-symbols-outlined" style="font-size:13px">close</span>
+            </button>
+          </li>
+        </ul>
+        <span v-else class="members-empty">None yet</span>
+      </div>
 
       <LibraryStats
         :total="totalCount"
@@ -421,6 +471,44 @@ async function handleInviteMember(payload: InvitedMember) {
 
 /* Add-a-model action */
 .add-model-btn { @apply flex-shrink-0; }
+
+/* Members field next to add-model button */
+.members-field {
+  @apply flex items-center gap-2 flex-wrap;
+  @apply px-3 py-1.5 rounded-xl;
+  @apply bg-slate-100/70 dark:bg-slate-800/60;
+  @apply border border-outline-variant/20 dark:border-white/5;
+  max-width: 320px;
+}
+
+.members-label {
+  @apply flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider;
+  @apply text-on-surface-variant dark:text-slate-400;
+}
+
+.members-list {
+  @apply flex items-center gap-1.5 flex-wrap;
+}
+
+.member-chip {
+  @apply flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full;
+  @apply bg-primary/10 dark:bg-primary/20 text-primary dark:text-sky-300;
+  @apply text-xs font-medium;
+}
+
+.member-name {
+  @apply max-w-[120px] truncate;
+}
+
+.member-remove {
+  @apply p-0.5 rounded-full transition-colors;
+  @apply text-primary/70 dark:text-sky-300/70;
+  @apply hover:bg-red-500/15 hover:text-red-500;
+}
+
+.members-empty {
+  @apply text-xs italic text-on-surface-variant/60 dark:text-slate-500;
+}
 
 /* Toast */
 .member-toast {

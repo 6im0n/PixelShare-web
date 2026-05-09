@@ -42,7 +42,7 @@ export function useLibraries() {
   }
 
   async function revokeClient(id: string, clientId: string) {
-    return api.delete<{ revoked: boolean }>(`/libraries/${id}/clients/${clientId}`)
+    return api.delete<{ revoked: boolean; clearedStars?: number }>(`/libraries/${id}/clients/${clientId}`)
   }
 
   return { list, get, create, update, remove, listClients, grantClient, revokeClient }
