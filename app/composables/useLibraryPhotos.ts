@@ -97,8 +97,8 @@ export function useLibraryPhotos(libraryId: string) {
         return {
           id: p.id,
           filename: p.name,
-          thumbnailUrl: api.authedUrl(`/photos/${p.id}/thumbnail`),
-          originalUrl: api.authedUrl(`/photos/${p.id}/original`),
+          thumbnailUrl: `/photos/${p.id}/thumbnail`,
+          originalUrl: `/photos/${p.id}/original`,
           fileSize: humanSize(p.byteSize),
           fileType: fileTypeFromName(p.name),
           width: p.width,
