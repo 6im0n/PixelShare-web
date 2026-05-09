@@ -18,12 +18,32 @@ const {
 const sortOpen = ref(false)
 const sortRoot = ref<HTMLElement | null>(null)
 
-const sortByOptions: { value: SortBy; label: string }[] = [
-  { value: 'uploadedAt',        label: 'Date added' },
-  { value: 'filename',          label: 'Name' },
-  { value: 'myStars',           label: 'Model stars' },
-  { value: 'photographerStars', label: 'Photographer stars' },
-]
+const { isPhotographer } = useRole()
+
+const sortByOptions = computed<{ value: SortBy; label: string }[]>(() => {
+  const base: { value: SortBy; label: string }[] = [
+    { value: 'uploadedAt', label: 'Date added' },
+    { value: 'filename',   label: 'Name' },
+  ]
+  if (isPhotographer.value) {
+    return [
+      ...base,
+      { value: 'modelStars',        label: 'Model stars' },
+      { value: 'photographerStars', label: 'My stars' },
+    ]
+  }
+  return [
+    ...base,
+    { value: 'myStars',           label: 'My stars' },
+    { value: 'photographerStars', label: 'Photographer stars' },
+  ]
+})
+
+// Auto-correct stale sort key when role changes (e.g. invalid 'myStars' for photographer view).
+watchEffect(() => {
+  const valid = sortByOptions.value.some(o => o.value === sortBy.value)
+  if (!valid) setSortBy('uploadedAt')
+})
 
 const sortDirOptions: { value: SortDir; label: string; icon: string }[] = [
   { value: 'desc', label: 'Highest first', icon: 'arrow_downward' },
@@ -31,7 +51,7 @@ const sortDirOptions: { value: SortDir; label: string; icon: string }[] = [
 ]
 
 const currentSortLabel = computed(() =>
-  sortByOptions.find(o => o.value === sortBy.value)?.label ?? 'Sort'
+  sortByOptions.value.find(o => o.value === sortBy.value)?.label ?? 'Sort'
 )
 
 function pickSortBy(by: SortBy) {
