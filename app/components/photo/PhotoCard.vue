@@ -55,12 +55,11 @@ function handleSetStars(stars: number) {
 
     <!-- ── Image ──────────────────────────────────────────── -->
     <div class="card-image" @click="emit('open', photo.id)">
-      <img
-        :src="photo.thumbnailUrl"
+      <UiAuthedImg
+        :path="photo.thumbnailUrl"
         :alt="photo.filename"
         class="card-img"
         loading="lazy"
-        draggable="false"
       />
 
       <div class="card-overlay">
