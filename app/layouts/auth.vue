@@ -19,9 +19,7 @@ const year = new Date().getFullYear()
     <div class="auth-center">
       <!-- Brand -->
       <div class="brand-block">
-        <div class="brand-icon">
-          <span class="material-symbols-outlined filled-icon" style="font-size:22px">camera_alt</span>
-        </div>
+        <img src="/pixelshare_icon.svg" alt="" class="brand-icon-img">
         <span class="brand-name">PixelShare</span>
       </div>
 
@@ -80,9 +78,8 @@ const year = new Date().getFullYear()
   @apply flex items-center gap-2.5;
 }
 
-.brand-icon {
-  @apply w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-on-primary;
-  @apply shadow-lg shadow-primary/30;
+.brand-icon-img {
+  @apply w-9 h-9 object-contain;
 }
 
 .brand-name {

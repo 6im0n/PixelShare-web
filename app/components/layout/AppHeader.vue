@@ -36,7 +36,10 @@ const inLibrary = computed(() => route.path.startsWith('/libraries/'))
         <span class="material-symbols-outlined">{{ sidebarOpen ? 'menu_open' : 'menu' }}</span>
       </button>
 
-      <span class="brand">PixelShare (Demo only)</span>
+      <NuxtLink to="/" class="brand-link" aria-label="PixelShare home">
+        <img src="/pixelshare_icon.svg" alt="" class="brand-logo">
+        <span class="brand">PixelShare</span>
+      </NuxtLink>
 
       <nav class="header-nav">
         <NuxtLink to="/" class="nav-btn" active-class="nav-btn--active">Libraries</NuxtLink>
@@ -57,7 +60,7 @@ const inLibrary = computed(() => route.path.startsWith('/libraries/'))
           {{ showPhotographerStars ? 'visibility' : 'visibility_off' }}
         </span>
         <span class="photo-stars-label">
-          {{ isPhotographer ? 'My stars' : 'Photographer stars' }}
+          {{ isPhotographer ? 'Model stars' : 'Photographer stars' }}
         </span>
       </button>
 
@@ -108,6 +111,14 @@ const inLibrary = computed(() => route.path.startsWith('/libraries/'))
 /* Left */
 .header-left {
   @apply flex items-center gap-3 sm:gap-6;
+}
+
+.brand-link {
+  @apply flex items-center gap-2;
+}
+
+.brand-logo {
+  @apply w-7 h-7 sm:w-8 sm:h-8 object-contain;
 }
 
 .brand {

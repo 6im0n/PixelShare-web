@@ -2,7 +2,7 @@
  * Shared filter state for the library grid.
  * useState ensures the filter bar component and the page share the same values.
  */
-export type SortBy  = 'myStars' | 'photographerStars' | 'uploadedAt' | 'filename'
+export type SortBy  = 'myStars' | 'modelStars' | 'photographerStars' | 'uploadedAt' | 'filename'
 export type SortDir = 'asc' | 'desc'
 
 export function useLibraryFilters() {

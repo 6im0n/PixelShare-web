@@ -21,7 +21,10 @@ const isZoomed    = ref(false)
 // ── Zoom ──────────────────────────────────────────────────────────────────
 const originX = ref(50)
 const originY = ref(50)
-const imgRef  = ref<HTMLImageElement>()
+const imgRef  = ref<{ $el: HTMLElement } | null>(null)
+function imgEl(): HTMLElement | null {
+  return imgRef.value?.$el ?? null
+}
 const ZOOM_SCALE = 2.2
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -52,9 +55,10 @@ function onKey(e: KeyboardEvent) {
 
 // ── Zoom ──────────────────────────────────────────────────────────────────
 function onImageClick(e: MouseEvent) {
-  if (!imgRef.value) return
+  const el = imgEl()
+  if (!el) return
   if (!isZoomed.value) {
-    const rect = imgRef.value.getBoundingClientRect()
+    const rect = el.getBoundingClientRect()
     originX.value = ((e.clientX - rect.left) / rect.width) * 100
     originY.value = ((e.clientY - rect.top) / rect.height) * 100
   }
@@ -62,8 +66,9 @@ function onImageClick(e: MouseEvent) {
 }
 
 function onMouseMove(e: MouseEvent) {
-  if (!isZoomed.value || !imgRef.value) return
-  const rect = imgRef.value.getBoundingClientRect()
+  const el = imgEl()
+  if (!isZoomed.value || !el) return
+  const rect = el.getBoundingClientRect()
   originX.value = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width)  * 100))
   originY.value = Math.max(0, Math.min(100, ((e.clientY - rect.top)  / rect.height) * 100))
 }
@@ -213,9 +218,9 @@ const sortedHistory = computed(() => [...props.history].reverse())
           @mousemove="onMouseMove"
           @click.self="handleContainerClick"
         >
-          <img
+          <UiAuthedImg
             ref="imgRef"
-            :src="photo.originalUrl"
+            :path="photo.originalUrl"
             :alt="photo.filename"
             class="photo-img"
             :class="isZoomed ? 'photo-img--zoomed' : ''"
@@ -224,7 +229,6 @@ const sortedHistory = computed(() => [...props.history].reverse())
               transformOrigin: `${originX}% ${originY}%`,
               transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             }"
-            draggable="false"
             @click.stop="onImageClick"
           />
         </div>
