@@ -60,6 +60,7 @@ async function loadInvitation(c: string) {
     return
   }
   if (c.length !== 8) {
+    manualCode.value = c
     lookupState.value = 'error'
     lookupError.value = 'Code must be 8 characters.'
     return
@@ -72,6 +73,7 @@ async function loadInvitation(c: string) {
     name.value = inv.name
     lookupState.value = 'ok'
   } catch (e: any) {
+    manualCode.value = c
     lookupState.value = 'error'
     lookupError.value = e?.data?.message ?? 'This invitation is invalid, used, or expired. Ask the photographer for a new one.'
   }
@@ -135,7 +137,7 @@ function handleGoogle() {
 
     <!-- Manual code entry — visible until invitation accepted -->
     <form
-      v-if="!queryCode && lookupState !== 'ok'"
+      v-if="lookupState !== 'ok' && lookupState !== 'loading' && (!queryCode || lookupState === 'error')"
       class="code-form"
       @submit.prevent="submitManualCode"
     >
@@ -145,7 +147,7 @@ function handleGoogle() {
           id="manual-code"
           :value="manualCode"
           type="text"
-          inputmode="latin"
+          inputmode="text"
           autocomplete="one-time-code"
           spellcheck="false"
           maxlength="8"

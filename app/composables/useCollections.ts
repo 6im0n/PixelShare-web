@@ -12,8 +12,14 @@ export interface CreateCollectionInput {
   members?: NewCollectionMember[]
 }
 
+export interface FailedMember {
+  name: string
+  reason: string
+}
+
 export interface CreateCollectionResult {
   id: string
+  failedMembers: FailedMember[]
 }
 
 export function useCollections() {
@@ -27,9 +33,11 @@ export function useCollections() {
 
     const lib = await create(name)
 
+    const failedMembers: FailedMember[] = []
     if (input.members?.length) {
-      await Promise.allSettled(
-        input.members.map(m => {
+      const queued = input.members
+      const results = await Promise.allSettled(
+        queued.map(m => {
           if (m.userId) return grantClient(lib.id, m.userId)
           if (m.invitationId) return addInvitationLibrary(m.invitationId, lib.id)
           if (m.email) return createInvitation({
@@ -40,9 +48,16 @@ export function useCollections() {
           return Promise.resolve()
         }),
       )
+      results.forEach((r, i) => {
+        const m = queued[i]
+        if (r.status === 'rejected' && m) {
+          const reason = r.reason instanceof Error ? r.reason.message : String(r.reason)
+          failedMembers.push({ name: m.name, reason })
+        }
+      })
     }
 
-    return { id: lib.id }
+    return { id: lib.id, failedMembers }
   }
 
   async function addMember(libraryId: string, member: NewCollectionMember): Promise<void> {

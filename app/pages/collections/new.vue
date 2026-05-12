@@ -21,13 +21,14 @@ const formError   = ref('')
 const nameError   = ref('')
 
 interface DraftMember {
-  key:          string
-  userId?:      string
-  name:         string
-  email?:       string
-  avatarUrl?:   string
-  hint?:        string
-  readyToShare: boolean
+  key:           string
+  userId?:       string
+  invitationId?: string
+  name:          string
+  email?:        string
+  avatarUrl?:    string
+  hint?:         string
+  readyToShare:  boolean
 }
 
 const members = ref<DraftMember[]>([])
@@ -37,10 +38,9 @@ const excludeUserIds = computed(() =>
   members.value.map(m => m.userId).filter((v): v is string => Boolean(v))
 )
 
-// Track the most recently generated invitation URL so we can show
-// a copy-to-clipboard surface inline after creating it.
-const lastInvite = ref<{ name: string, url: string } | null>(null)
-const copyState  = ref<'idle' | 'copied'>('idle')
+const excludeInvitationIds = computed(() =>
+  members.value.map(m => m.invitationId).filter((v): v is string => Boolean(v))
+)
 
 function newKey() {
   return `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -50,40 +50,32 @@ function onPick(payload: PickedMember) {
   members.value = [{
     key:          newKey(),
     userId:       payload.userId,
+    invitationId: payload.invitationId,
     name:         payload.name,
     email:        payload.email,
     avatarUrl:    payload.avatarUrl,
+    hint:         payload.invitationId && !payload.userId
+      ? 'Pending invitation — will be re-attached to this collection'
+      : undefined,
     readyToShare: false,
   }]
   showAddPanel.value = false
-  lastInvite.value = null
 }
 
 function onInvite(payload: InvitedMember) {
   members.value = [{
     key:          newKey(),
+    invitationId: payload.invitationId,
     email:        payload.email,
     name:         payload.name,
     hint:         'Will be invited by email when collection is created',
     readyToShare: false,
   }]
   showAddPanel.value = false
-  lastInvite.value = null
 }
 
 function removeMember(key: string) {
   members.value = members.value.filter(m => m.key !== key)
-}
-
-async function copyInviteUrl() {
-  if (!lastInvite.value) return
-  try {
-    await navigator.clipboard.writeText(lastInvite.value.url)
-    copyState.value = 'copied'
-    setTimeout(() => { copyState.value = 'idle' }, 1800)
-  } catch {
-    copyState.value = 'idle'
-  }
 }
 
 // ─── Submit ───────────────────────────────────────────────────────────────
@@ -99,16 +91,21 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    const { id } = await createCollection({
+    const { id, failedMembers } = await createCollection({
       name:        trimmed,
       description: description.value.trim() || undefined,
       members: members.value.map(m => ({
         userId:       m.userId,
+        invitationId: m.invitationId,
         email:        m.email,
         name:         m.name,
         readyToShare: m.readyToShare,
       })),
     })
+    if (failedMembers.length) {
+      const names = failedMembers.map(f => f.name).join(', ')
+      formError.value = `Collection created, but could not add: ${names}. You can retry from the library page.`
+    }
     await navigateTo(`/libraries/${id}`)
   } catch (err: unknown) {
     formError.value = err instanceof Error ? err.message : 'Could not create the collection.'
@@ -197,40 +194,11 @@ async function handleSubmit() {
           </li>
         </ul>
 
-        <!-- Last-generated invite link surface -->
-        <Transition name="form-err">
-          <div v-if="lastInvite" class="invite-card">
-            <div class="invite-head">
-              <span class="material-symbols-outlined invite-icon" aria-hidden="true">link</span>
-              <div class="invite-text">
-                <span class="invite-title">Invitation link for {{ lastInvite.name }}</span>
-                <span class="invite-sub">Single-use. Share it directly with the model.</span>
-              </div>
-            </div>
-            <div class="invite-row">
-              <input
-                type="text"
-                readonly
-                class="invite-url"
-                :value="lastInvite.url"
-                @focus="($event.target as HTMLInputElement).select()"
-              />
-              <UiButton
-                variant="secondary"
-                size="md"
-                :icon="copyState === 'copied' ? 'check' : 'content_copy'"
-                @click="copyInviteUrl"
-              >
-                {{ copyState === 'copied' ? 'Copied' : 'Copy' }}
-              </UiButton>
-            </div>
-          </div>
-        </Transition>
-
         <!-- Add controls -->
         <div v-if="showAddPanel" class="add-panel">
           <AddMemberControls
             :exclude-user-ids="excludeUserIds"
+            :exclude-invitation-ids="excludeInvitationIds"
             @pick="onPick"
             @invite="onInvite"
             @skip="showAddPanel = false"
@@ -333,43 +301,6 @@ async function handleSubmit() {
 
 .member-list {
   @apply flex flex-col gap-2;
-}
-
-/* Invite card */
-.invite-card {
-  @apply flex flex-col gap-3 p-4 rounded-2xl;
-  @apply bg-emerald-50/60 dark:bg-emerald-900/15;
-  @apply border border-emerald-200/70 dark:border-emerald-800/40;
-}
-
-.invite-head { @apply flex items-start gap-3; }
-
-.invite-icon {
-  @apply text-emerald-700 dark:text-emerald-400;
-  font-size: 20px !important;
-}
-
-.invite-text { @apply flex flex-col; }
-
-.invite-title {
-  @apply text-sm font-semibold;
-  @apply text-emerald-900 dark:text-emerald-200;
-}
-
-.invite-sub {
-  @apply text-xs;
-  @apply text-emerald-800/80 dark:text-emerald-300/80;
-}
-
-.invite-row {
-  @apply flex flex-col sm:flex-row gap-2;
-}
-
-.invite-url {
-  @apply flex-1 px-3 py-2 rounded-xl text-xs font-mono outline-none;
-  @apply bg-white/70 dark:bg-black/20;
-  @apply border border-emerald-200/70 dark:border-emerald-800/40;
-  @apply text-on-surface dark:text-slate-100;
 }
 
 .add-panel {
