@@ -58,8 +58,9 @@ function handleSetStars(stars: number) {
       <UiAuthedImg
         :path="photo.thumbnailUrl"
         :alt="photo.filename"
+        :width="photo.width"
+        :height="photo.height"
         class="card-img"
-        loading="lazy"
       />
 
       <div class="card-overlay">

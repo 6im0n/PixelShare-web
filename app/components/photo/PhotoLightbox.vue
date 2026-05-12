@@ -222,6 +222,9 @@ const sortedHistory = computed(() => [...props.history].reverse())
             ref="imgRef"
             :path="photo.originalUrl"
             :alt="photo.filename"
+            :width="photo.width"
+            :height="photo.height"
+            eager
             class="photo-img"
             :class="isZoomed ? 'photo-img--zoomed' : ''"
             :style="{
