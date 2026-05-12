@@ -21,16 +21,13 @@ const formError   = ref('')
 const nameError   = ref('')
 
 interface DraftMember {
-  /** Stable id for v-for keying. */
-  key:             string
-  userId?:         string
-  invitationToken?:string
-  invitationUrl?:  string
-  name:            string
-  email?:          string
-  avatarUrl?:      string
-  hint?:           string
-  readyToShare:    boolean
+  key:          string
+  userId?:      string
+  name:         string
+  email?:       string
+  avatarUrl?:   string
+  hint?:        string
+  readyToShare: boolean
 }
 
 const members = ref<DraftMember[]>([])
@@ -65,8 +62,9 @@ function onPick(payload: PickedMember) {
 function onInvite(payload: InvitedMember) {
   members.value = [{
     key:          newKey(),
+    email:        payload.email,
     name:         payload.name,
-    hint:         'Invitation sent by email',
+    hint:         'Will be invited by email when collection is created',
     readyToShare: false,
   }]
   showAddPanel.value = false
@@ -105,10 +103,10 @@ async function handleSubmit() {
       name:        trimmed,
       description: description.value.trim() || undefined,
       members: members.value.map(m => ({
-        userId:          m.userId,
-        invitationToken: m.invitationToken,
-        name:            m.name,
-        readyToShare:    m.readyToShare,
+        userId:       m.userId,
+        email:        m.email,
+        name:         m.name,
+        readyToShare: m.readyToShare,
       })),
     })
     await navigateTo(`/libraries/${id}`)
