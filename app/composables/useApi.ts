@@ -46,10 +46,11 @@ export function useApi() {
     patch:  <T>(path: string, body?: ReqBody, opts?: Omit<ReqOpts, 'method' | 'body'>) => request<T>(path, { ...opts, method: 'PATCH', body }),
     put:    <T>(path: string, body?: ReqBody, opts?: Omit<ReqOpts, 'method' | 'body'>) => request<T>(path, { ...opts, method: 'PUT', body }),
     delete: <T>(path: string, opts?: Omit<ReqOpts, 'method' | 'body'>) => request<T>(path, { ...opts, method: 'DELETE' }),
-    async getBlob(path: string): Promise<Blob> {
+    async getBlob(path: string, signal?: AbortSignal): Promise<Blob> {
       const t = token.value
       const res = await fetch(`${base}/api${path}`, {
         headers: t ? { authorization: t } : undefined,
+        signal,
       })
       if (!res.ok) throw new Error(`Fetch failed (${res.status})`)
       return res.blob()

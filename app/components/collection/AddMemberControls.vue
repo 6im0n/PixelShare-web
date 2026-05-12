@@ -55,7 +55,9 @@ const pendingInvites = ref<PendingPickRow[]>([])
 const loadingKnown = ref(false)
 const search = ref('')
 
-const filteredModels = computed(() => {
+const RENDER_CAP = 50
+
+const filteredModelsAll = computed(() => {
   const exclude = new Set(props.excludeUserIds ?? [])
   const q = search.value.trim().toLowerCase()
   return knownModels.value
@@ -63,13 +65,21 @@ const filteredModels = computed(() => {
     .filter(m => !q || m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
 })
 
-const filteredPending = computed(() => {
+const filteredPendingAll = computed(() => {
   const exclude = new Set(props.excludeInvitationIds ?? [])
   const q = search.value.trim().toLowerCase()
   return pendingInvites.value
     .filter(p => !exclude.has(p.invitationId))
     .filter(p => !q || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q))
 })
+
+const filteredModels = computed(() => filteredModelsAll.value.slice(0, RENDER_CAP))
+const filteredPending = computed(() => filteredPendingAll.value.slice(0, RENDER_CAP))
+
+const hiddenCount = computed(() =>
+  Math.max(0, filteredModelsAll.value.length - filteredModels.value.length)
+  + Math.max(0, filteredPendingAll.value.length - filteredPending.value.length),
+)
 
 async function loadKnownModels() {
   loadingKnown.value = true
@@ -226,6 +236,10 @@ function chooseMode(next: Mode) {
           </button>
         </li>
       </ul>
+
+      <p v-if="hiddenCount > 0" class="hint">
+        +{{ hiddenCount }} more — refine your search to narrow results.
+      </p>
     </div>
 
     <!-- Invite new model -->

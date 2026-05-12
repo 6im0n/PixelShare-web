@@ -17,6 +17,7 @@ const wrapper = ref<HTMLElement | null>(null)
 
 let currentObjectUrl: string | null = null
 let observer: IntersectionObserver | null = null
+let inflight: AbortController | null = null
 
 const aspectStyle = computed(() => {
   if (props.width && props.height) {
@@ -26,15 +27,23 @@ const aspectStyle = computed(() => {
 })
 
 async function load(path: string) {
+  inflight?.abort()
+  const ctrl = new AbortController()
+  inflight = ctrl
   error.value = false
   try {
-    const blob = await api.getBlob(path)
+    const blob = await api.getBlob(path, ctrl.signal)
+    if (ctrl.signal.aborted) return
     if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl)
     currentObjectUrl = URL.createObjectURL(blob)
     blobUrl.value = currentObjectUrl
-  } catch {
+  } catch (e: unknown) {
+    if (ctrl.signal.aborted) return
+    if (e instanceof DOMException && e.name === 'AbortError') return
     error.value = true
     blobUrl.value = ''
+  } finally {
+    if (inflight === ctrl) inflight = null
   }
 }
 
@@ -69,6 +78,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  inflight?.abort()
   if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl)
   observer?.disconnect()
 })
