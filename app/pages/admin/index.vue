@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ApiClient } from '~/composables/useModels'
+import type { Invitation } from '~/composables/useInvitations'
 
 definePageMeta({ layout: 'default' })
 
@@ -7,7 +8,7 @@ const { isAdmin } = useRole()
 watchEffect(() => { if (!isAdmin.value) navigateTo('/') })
 
 const api = useApi()
-const { data: authData } = useAuth()
+const invitationsApi = useInvitations()
 
 // ── Users ─────────────────────────────────────────────────────────────────
 interface AdminUser extends ApiClient {
@@ -73,7 +74,27 @@ async function confirmDelete() {
   }
 }
 
-// ── Invite ────────────────────────────────────────────────────────────────
+// ── Invitations ───────────────────────────────────────────────────────────
+const invitations = ref<Invitation[]>([])
+const invitationsLoading = ref(false)
+
+async function loadInvitations() {
+  invitationsLoading.value = true
+  try {
+    invitations.value = await invitationsApi.list()
+  } catch (e: any) {
+    error.value = e?.data?.message ?? 'Failed to load invitations.'
+  } finally {
+    invitationsLoading.value = false
+  }
+}
+
+onMounted(loadInvitations)
+
+const pendingInvitations = computed(() =>
+  invitations.value.filter(i => i.status === 'pending' || i.status === 'expired'),
+)
+
 const showInvite = ref(false)
 const inviteEmail = ref('')
 const inviteName  = ref('')
@@ -81,22 +102,49 @@ const inviting    = ref(false)
 const inviteFeedback = ref<{ kind: 'success' | 'error'; text: string } | null>(null)
 
 async function sendInvite() {
-  if (!inviteEmail.value) return
+  if (!inviteEmail.value || inviteName.value.trim().length < 2) return
   inviting.value = true
   inviteFeedback.value = null
   try {
-    await api.post('/account/invite', {
+    const inv = await invitationsApi.create({
       email: inviteEmail.value,
-      name: inviteName.value || undefined,
-      photographerName: authData.value?.name,
+      name: inviteName.value,
     })
-    inviteFeedback.value = { kind: 'success', text: `Invitation sent to ${inviteEmail.value}.` }
+    invitations.value = [inv, ...invitations.value]
+    inviteFeedback.value = { kind: 'success', text: `Invitation sent to ${inv.email}.` }
     inviteEmail.value = ''
     inviteName.value  = ''
   } catch (e: any) {
     inviteFeedback.value = { kind: 'error', text: e?.data?.message ?? 'Failed to send invite.' }
   } finally {
     inviting.value = false
+  }
+}
+
+const busyInvitationId = ref<string | null>(null)
+
+async function resendInvitation(inv: Invitation) {
+  busyInvitationId.value = inv.id
+  try {
+    await invitationsApi.resend(inv.id)
+    await loadInvitations()
+  } catch (e: any) {
+    error.value = e?.data?.message ?? 'Failed to resend.'
+  } finally {
+    busyInvitationId.value = null
+  }
+}
+
+async function revokeInvitation(inv: Invitation) {
+  if (!confirm(`Revoke invitation for ${inv.email}? The code stops working immediately.`)) return
+  busyInvitationId.value = inv.id
+  try {
+    await invitationsApi.revoke(inv.id)
+    invitations.value = invitations.value.filter(i => i.id !== inv.id)
+  } catch (e: any) {
+    error.value = e?.data?.message ?? 'Failed to revoke.'
+  } finally {
+    busyInvitationId.value = null
   }
 }
 
@@ -158,6 +206,52 @@ function initials(name: string, email: string) {
             >
               <span class="material-symbols-outlined" style="font-size:18px">delete</span>
             </button>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Pending invitations section -->
+      <section class="section">
+        <h2 class="section-title">
+          <span class="material-symbols-outlined" style="font-size:18px">mail</span>
+          Pending invitations ({{ pendingInvitations.length }})
+        </h2>
+
+        <div v-if="invitationsLoading" class="hint">Loading…</div>
+        <div v-else-if="pendingInvitations.length === 0" class="hint">No pending invitations.</div>
+
+        <ul v-else class="user-list">
+          <li v-for="inv in pendingInvitations" :key="inv.id" class="user-row user-row--staff">
+            <span class="avatar avatar--pending">{{ initials(inv.name, inv.email) }}</span>
+            <div class="user-info">
+              <span class="user-name">{{ inv.name }}</span>
+              <span class="user-email">{{ inv.email }}</span>
+            </div>
+            <div class="user-meta">
+              <span class="meta-chip" :class="inv.status === 'expired' ? 'meta-chip--warn' : 'meta-chip--pending'">
+                {{ inv.status === 'expired' ? 'Expired' : 'Pending' }}
+              </span>
+              <span class="invitation-code">{{ inv.code }}</span>
+              <span class="meta-date">Expires {{ fmt(inv.expiresAt) }}</span>
+            </div>
+            <div class="invitation-actions">
+              <button
+                class="action-btn"
+                title="Resend email"
+                :disabled="busyInvitationId === inv.id"
+                @click.stop="resendInvitation(inv)"
+              >
+                <span class="material-symbols-outlined" style="font-size:18px">send</span>
+              </button>
+              <button
+                class="action-btn action-btn--danger"
+                title="Revoke"
+                :disabled="busyInvitationId === inv.id"
+                @click.stop="revokeInvitation(inv)"
+              >
+                <span class="material-symbols-outlined" style="font-size:18px">close</span>
+              </button>
+            </div>
           </li>
         </ul>
       </section>
@@ -261,7 +355,7 @@ function initials(name: string, email: string) {
       <div v-if="showInvite" class="drawer-backdrop" @click.self="showInvite = false">
         <aside class="drawer drawer--sm">
           <h2 class="drawer-name">Invite a model</h2>
-          <p class="hint">They'll receive an email with a link to create their account.</p>
+          <p class="hint">They'll receive an email with a unique 8-character code to sign up. The code expires in 7 days.</p>
 
           <Transition name="fb">
             <UiAlert v-if="inviteFeedback" :variant="inviteFeedback.kind" class="mb-1">
@@ -280,13 +374,21 @@ function initials(name: string, email: string) {
             />
             <UiInput
               v-model="inviteName"
-              label="Name (optional)"
+              label="Name"
               icon="person"
               placeholder="Casey Rivera"
+              required
             />
+            <p class="invite-hint">The model can change their name when registering.</p>
             <div class="confirm-actions">
               <UiButton variant="ghost" type="button" @click="showInvite = false">Cancel</UiButton>
-              <UiButton variant="primary" type="submit" icon="send" :loading="inviting" :disabled="!inviteEmail">
+              <UiButton
+                variant="primary"
+                type="submit"
+                icon="send"
+                :loading="inviting"
+                :disabled="!inviteEmail || inviteName.trim().length < 2"
+              >
                 Send invite
               </UiButton>
             </div>
@@ -377,6 +479,39 @@ function initials(name: string, email: string) {
 
 .meta-chip--role {
   @apply bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-fixed-dim;
+}
+
+.meta-chip--pending {
+  @apply bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400;
+}
+
+.avatar--pending {
+  @apply bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400;
+}
+
+.invitation-code {
+  @apply text-[11px] font-mono font-bold tracking-wider px-2 py-0.5 rounded;
+  @apply bg-black/5 dark:bg-white/10 text-on-surface dark:text-white/80;
+}
+
+.invitation-actions {
+  @apply flex items-center gap-1 flex-shrink-0;
+}
+
+.action-btn {
+  @apply p-1.5 rounded-lg;
+  @apply text-on-surface-variant hover:text-primary;
+  @apply hover:bg-primary/10 transition-colors;
+  @apply disabled:opacity-40 disabled:cursor-not-allowed;
+}
+
+.action-btn--danger {
+  @apply hover:text-red-500 dark:hover:text-red-400;
+  @apply hover:bg-red-50 dark:hover:bg-red-900/20;
+}
+
+.invite-hint {
+  @apply text-xs text-on-surface-variant/70 dark:text-white/35 -mt-2;
 }
 
 .meta-date {

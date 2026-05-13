@@ -20,10 +20,11 @@
     "vue-router": "^5.0.4"
   },
   "devDependencies": {
+    "@iconify-json/material-symbols": "^1.2.71",
+    "@types/bun": "latest",
     "@types/node": "^25.6.0",
     "@vue/language-core": "^3.2.7",
     "typescript": "^6.0.3",
-    "vue-tsc": "^3.2.7",
-    "@types/bun": "latest"
+    "vue-tsc": "^3.2.7"
   }
 }

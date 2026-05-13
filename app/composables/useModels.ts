@@ -25,9 +25,5 @@ export function useModels() {
     }))
   }
 
-  async function inviteModel(email: string, name?: string): Promise<void> {
-    await api.post('/account/invite', { email, name })
-  }
-
-  return { listKnownModels, inviteModel }
+  return { listKnownModels }
 }

@@ -1,3 +1,24 @@
+export interface RegisteredLibraryMember {
+  id: string
+  email: string
+  name: string
+  grantedAt: string
+  status: 'registered'
+}
+
+export interface PendingLibraryMember {
+  invitationId: string
+  email: string
+  name: string
+  grantedAt: string
+  status: 'pending'
+}
+
+export interface LibraryClientList {
+  members: RegisteredLibraryMember[]
+  pending: PendingLibraryMember[]
+}
+
 export interface ApiLibrary {
   id: string
   name: string
@@ -32,9 +53,7 @@ export function useLibraries() {
   }
 
   async function listClients(id: string) {
-    return api.get<Array<{ id: string; email: string; name: string; grantedAt: string }>>(
-      `/libraries/${id}/clients`,
-    )
+    return api.get<LibraryClientList>(`/libraries/${id}/clients`)
   }
 
   async function grantClient(id: string, clientId: string) {

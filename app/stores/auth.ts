@@ -11,9 +11,12 @@ export interface AuthUser {
 
 export const useAuthStore = defineStore('auth', {
   actions: {
-    startGoogleOAuth() {
+    startGoogleOAuth(invitationCode?: string) {
       const config = useRuntimeConfig()
-      window.location.href = `${config.public.apiBase}/api/oauth/google/start`
+      const base = `${config.public.apiBase}/api/oauth/google/start`
+      window.location.href = invitationCode
+        ? `${base}?invitation=${encodeURIComponent(invitationCode.toUpperCase())}`
+        : base
     },
   },
 })

@@ -4,22 +4,29 @@ import type { User } from '~/types'
 type Mode = 'pick' | 'invite' | 'skip'
 
 export interface PickedMember {
-  userId: string
+  /** Set for registered users. */
+  userId?: string
+  /** Set for pending invitations (re-attach existing pending). */
+  invitationId?: string
   name:   string
   email:  string
   avatarUrl?: string
 }
 
 export interface InvitedMember {
-  invitationToken: string
-  name:            string
-  url:             string
+  email: string
+  name:  string
+  /** Set if invitation was created immediately (existing library); empty during draft flow. */
+  invitationId?: string
+  code?: string
 }
 
 const props = defineProps<{
   /** User ids already added to the collection (hidden from the picker). */
   excludeUserIds?: string[]
-  /** Library id passed to invitation creation when the collection already exists. */
+  /** Invitation ids already attached to this library (hidden from picker). */
+  excludeInvitationIds?: string[]
+  /** Library id — when set, invitations are created immediately bound to this library. */
   libraryId?: string
   /** Compact layout for use inside modals / popovers. */
   compact?: boolean
@@ -31,16 +38,26 @@ const emit = defineEmits<{
   'skip':   []
 }>()
 
-const { listKnownModels, inviteModel } = useModels()
+const { listKnownModels } = useModels()
+const { create: createInvitation, list: listInvitations } = useInvitations()
+
+interface PendingPickRow {
+  invitationId: string
+  name: string
+  email: string
+}
 
 const mode  = ref<Mode>('pick')
 const error = ref('')
 
 const knownModels = ref<User[]>([])
+const pendingInvites = ref<PendingPickRow[]>([])
 const loadingKnown = ref(false)
 const search = ref('')
 
-const filteredModels = computed(() => {
+const RENDER_CAP = 50
+
+const filteredModelsAll = computed(() => {
   const exclude = new Set(props.excludeUserIds ?? [])
   const q = search.value.trim().toLowerCase()
   return knownModels.value
@@ -48,10 +65,33 @@ const filteredModels = computed(() => {
     .filter(m => !q || m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
 })
 
+const filteredPendingAll = computed(() => {
+  const exclude = new Set(props.excludeInvitationIds ?? [])
+  const q = search.value.trim().toLowerCase()
+  return pendingInvites.value
+    .filter(p => !exclude.has(p.invitationId))
+    .filter(p => !q || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q))
+})
+
+const filteredModels = computed(() => filteredModelsAll.value.slice(0, RENDER_CAP))
+const filteredPending = computed(() => filteredPendingAll.value.slice(0, RENDER_CAP))
+
+const hiddenCount = computed(() =>
+  Math.max(0, filteredModelsAll.value.length - filteredModels.value.length)
+  + Math.max(0, filteredPendingAll.value.length - filteredPending.value.length),
+)
+
 async function loadKnownModels() {
   loadingKnown.value = true
   try {
-    knownModels.value = await listKnownModels()
+    const [models, invites] = await Promise.all([
+      listKnownModels(),
+      listInvitations().catch(() => []),
+    ])
+    knownModels.value = models
+    pendingInvites.value = invites
+      .filter(i => i.status === 'pending')
+      .map(i => ({ invitationId: i.id, name: i.name, email: i.email }))
   } catch (err: unknown) {
     error.value = err instanceof Error ? err.message : 'Could not load models.'
   } finally {
@@ -69,6 +109,14 @@ function pick(model: User) {
   })
 }
 
+function pickPending(row: PendingPickRow) {
+  emit('pick', {
+    invitationId: row.invitationId,
+    name: row.name,
+    email: row.email,
+  })
+}
+
 // ─── Invite flow ──────────────────────────────────────────────────────────
 const inviteEmail = ref('')
 const inviteName  = ref('')
@@ -81,15 +129,25 @@ async function submitInvite() {
     error.value = 'Please enter an email address.'
     return
   }
+  if (inviteName.value.trim().length < 2) {
+    error.value = 'Please enter a name (min 2 characters).'
+    return
+  }
   inviting.value = true
   try {
-    await inviteModel(inviteEmail.value, inviteName.value || undefined)
+    const email = inviteEmail.value.trim()
+    const name = inviteName.value.trim()
+    if (props.libraryId) {
+      const inv = await createInvitation({ email, name, libraryIds: [props.libraryId] })
+      emit('invite', { email: inv.email, name: inv.name, invitationId: inv.id, code: inv.code })
+    } else {
+      emit('invite', { email, name })
+    }
     inviteSent.value = true
-    emit('invite', { invitationToken: '', name: inviteName.value.trim() || inviteEmail.value, url: '' })
     inviteEmail.value = ''
     inviteName.value  = ''
-  } catch (err: unknown) {
-    error.value = err instanceof Error ? err.message : 'Could not generate invitation link.'
+  } catch (err: any) {
+    error.value = err?.data?.message ?? (err instanceof Error ? err.message : 'Could not create invitation.')
   } finally {
     inviting.value = false
   }
@@ -146,7 +204,7 @@ function chooseMode(next: Mode) {
 
       <div v-if="loadingKnown" class="hint">Loading models…</div>
 
-      <div v-else-if="filteredModels.length === 0" class="hint">
+      <div v-else-if="filteredModels.length === 0 && filteredPending.length === 0" class="hint">
         No matching models. Try inviting a new one.
       </div>
 
@@ -164,7 +222,24 @@ function chooseMode(next: Mode) {
             <span class="material-symbols-outlined model-add" aria-hidden="true">add</span>
           </button>
         </li>
+        <li v-for="row in filteredPending" :key="row.invitationId">
+          <button type="button" class="model-btn model-btn--pending" @click="pickPending(row)">
+            <span class="model-avatar model-avatar--pending">
+              <span class="material-symbols-outlined" style="font-size:18px">hourglass_empty</span>
+            </span>
+            <span class="model-text">
+              <span class="model-name">{{ row.name }}</span>
+              <span class="model-email">{{ row.email }}</span>
+            </span>
+            <span class="pending-badge">Pending</span>
+            <span class="material-symbols-outlined model-add" aria-hidden="true">add</span>
+          </button>
+        </li>
       </ul>
+
+      <p v-if="hiddenCount > 0" class="hint">
+        +{{ hiddenCount }} more — refine your search to narrow results.
+      </p>
     </div>
 
     <!-- Invite new model -->
@@ -261,6 +336,17 @@ function chooseMode(next: Mode) {
 
 .model-btn:hover .model-add {
   @apply text-primary dark:text-primary-fixed-dim;
+}
+
+.model-btn--pending {
+  @apply border-amber-300/40 dark:border-amber-500/30;
+}
+.model-avatar--pending {
+  @apply bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400;
+}
+.pending-badge {
+  @apply text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex-shrink-0;
+  @apply bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400;
 }
 
 /* Transitions */

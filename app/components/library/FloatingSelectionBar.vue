@@ -25,7 +25,7 @@ const overflow      = computed(() => Math.max(0, props.starredPhotos.length - 3)
               :key="photo.id"
               class="thumbnail"
             >
-              <UiAuthedImg :path="photo.thumbnailUrl" :alt="photo.filename" class="thumbnail-img" />
+              <UiAuthedImg :path="photo.thumbnailUrl" :alt="photo.filename" :width="photo.width" :height="photo.height" eager class="thumbnail-img" />
             </div>
             <div v-if="overflow > 0" class="thumbnail thumbnail--overflow">
               +{{ overflow }}

@@ -31,7 +31,7 @@ onMounted(async () => {
     return
   }
   try {
-    await api.get(`/auth/verify-email?token=${encodeURIComponent(token)}`)
+    await api.post('/auth/verify-email', { token })
     status.value = 'success'
     message.value = 'Your email has been verified. You can now sign in.'
   } catch (err: any) {

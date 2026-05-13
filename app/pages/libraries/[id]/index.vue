@@ -140,13 +140,41 @@ async function doUpload(files: File[]) {
 
 // ── Library meta ──────────────────────────────────────────────────────────
 const { get: getLibrary, listClients, revokeClient } = useLibraries()
-const members = ref<Array<{ id: string; email: string; name: string }>>([])
+
+type DisplayedMember =
+  | { kind: 'registered'; id: string; email: string; name: string }
+  | { kind: 'pending'; invitationId: string; email: string; name: string }
+
+const members = ref<DisplayedMember[]>([])
+const { revoke: revokeInvitation } = useInvitations()
 
 async function loadMembers() {
   try {
-    members.value = await listClients(libraryId)
+    const res = await listClients(libraryId)
+    members.value = [
+      ...res.members.map(m => ({ kind: 'registered' as const, id: m.id, email: m.email, name: m.name })),
+      ...res.pending.map(p => ({ kind: 'pending' as const, invitationId: p.invitationId, email: p.email, name: p.name })),
+    ]
   } catch {
     members.value = []
+  }
+}
+
+const memberUserIds = computed(() =>
+  members.value.filter((m): m is Extract<DisplayedMember, { kind: 'registered' }> => m.kind === 'registered').map(m => m.id),
+)
+const memberInvitationIds = computed(() =>
+  members.value.filter((m): m is Extract<DisplayedMember, { kind: 'pending' }> => m.kind === 'pending').map(m => m.invitationId),
+)
+
+async function handleRevokePending(invitationId: string, name: string) {
+  if (!confirm(`Revoke invitation for ${name}? They won't be able to register with that code.`)) return
+  try {
+    await revokeInvitation(invitationId)
+    members.value = members.value.filter(m => m.kind === 'registered' || m.invitationId !== invitationId)
+    addMemberFeedback.value = { kind: 'success', text: `Invitation for ${name} revoked.` }
+  } catch (err: unknown) {
+    addMemberFeedback.value = { kind: 'error', text: err instanceof Error ? err.message : 'Could not revoke.' }
   }
 }
 
@@ -154,7 +182,7 @@ async function handleRemoveMember(id: string, name: string) {
   if (!confirm(`Remove ${name} from this collection? Their stars on these photos will be cleared.`)) return
   try {
     const res = await revokeClient(libraryId, id)
-    members.value = members.value.filter(m => m.id !== id)
+    members.value = members.value.filter(m => m.kind === 'pending' || m.id !== id)
     await fetchPhotos()
     const cleared = res?.clearedStars ?? 0
     addMemberFeedback.value = {
@@ -195,24 +223,26 @@ const addMemberFeedback = ref<{ kind: 'success' | 'error', text: string } | null
 
 async function handlePickMember(payload: PickedMember) {
   try {
-    await addMember(libraryId, { userId: payload.userId, name: payload.name, readyToShare: false })
-    addMemberFeedback.value = { kind: 'success', text: `${payload.name} added to the collection.` }
+    await addMember(libraryId, {
+      userId: payload.userId,
+      invitationId: payload.invitationId,
+      name: payload.name,
+      readyToShare: false,
+    })
+    const verb = payload.invitationId ? 'invitation re-linked' : 'added to the collection'
+    addMemberFeedback.value = { kind: 'success', text: `${payload.name} ${verb}.` }
     showAddMember.value = false
     await loadMembers()
-  } catch (err: unknown) {
-    addMemberFeedback.value = { kind: 'error', text: err instanceof Error ? err.message : 'Could not add member.' }
+  } catch (err: any) {
+    addMemberFeedback.value = { kind: 'error', text: err?.data?.message ?? (err instanceof Error ? err.message : 'Could not add member.') }
   }
 }
 
 async function handleInviteMember(payload: InvitedMember) {
-  try {
-    await addMember(libraryId, { invitationToken: payload.invitationToken, name: payload.name, readyToShare: false })
-    try { await navigator.clipboard.writeText(payload.url) } catch { /* clipboard unavailable */ }
-    addMemberFeedback.value = { kind: 'success', text: `Invitation link for ${payload.name} copied to clipboard.` }
-    showAddMember.value = false
-  } catch (err: unknown) {
-    addMemberFeedback.value = { kind: 'error', text: err instanceof Error ? err.message : 'Could not generate invitation.' }
-  }
+  // AddMemberControls already created the invitation server-side because libraryId is passed.
+  addMemberFeedback.value = { kind: 'success', text: `Invitation email sent to ${payload.email}.` }
+  showAddMember.value = false
+  await loadMembers()
 }
 </script>
 
@@ -311,13 +341,35 @@ async function handleInviteMember(payload: InvitedMember) {
           Models
         </span>
         <ul v-if="members.length > 0" class="members-list">
-          <li v-for="m in members" :key="m.id" class="member-chip" :title="m.email">
+          <li
+            v-for="m in members"
+            :key="m.kind === 'registered' ? m.id : m.invitationId"
+            class="member-chip"
+            :class="m.kind === 'pending' ? 'member-chip--pending' : 'member-chip--registered'"
+            :title="m.kind === 'pending' ? `${m.email} — invitation pending` : m.email"
+          >
+            <span
+              v-if="m.kind === 'pending'"
+              class="material-symbols-outlined member-dot"
+              aria-hidden="true"
+              style="font-size:12px"
+            >hourglass_empty</span>
             <span class="member-name">{{ m.name || m.email }}</span>
             <button
+              v-if="m.kind === 'registered'"
               type="button"
               class="member-remove"
               :aria-label="`Remove ${m.name || m.email}`"
               @click="handleRemoveMember(m.id, m.name || m.email)"
+            >
+              <span class="material-symbols-outlined" style="font-size:13px">close</span>
+            </button>
+            <button
+              v-else
+              type="button"
+              class="member-remove"
+              :aria-label="`Revoke invitation for ${m.name || m.email}`"
+              @click="handleRevokePending(m.invitationId, m.name || m.email)"
             >
               <span class="material-symbols-outlined" style="font-size:13px">close</span>
             </button>
@@ -372,6 +424,8 @@ async function handleInviteMember(payload: InvitedMember) {
         <AddMemberControls
           compact
           :library-id="libraryId"
+          :exclude-user-ids="memberUserIds"
+          :exclude-invitation-ids="memberInvitationIds"
           @pick="handlePickMember"
           @invite="handleInviteMember"
           @skip="showAddMember = false"
@@ -492,18 +546,35 @@ async function handleInviteMember(payload: InvitedMember) {
 
 .member-chip {
   @apply flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full;
-  @apply bg-primary/10 dark:bg-primary/20 text-primary dark:text-sky-300;
   @apply text-xs font-medium;
+}
+
+.member-chip--registered {
+  @apply bg-primary/10 dark:bg-primary/20 text-primary dark:text-sky-300;
+}
+
+.member-chip--pending {
+  @apply bg-amber-500/15 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300;
 }
 
 .member-name {
   @apply max-w-[120px] truncate;
 }
 
+.member-dot {
+  @apply opacity-80;
+}
+
 .member-remove {
   @apply p-0.5 rounded-full transition-colors;
-  @apply text-primary/70 dark:text-sky-300/70;
   @apply hover:bg-red-500/15 hover:text-red-500;
+}
+
+.member-chip--registered .member-remove {
+  @apply text-primary/70 dark:text-sky-300/70;
+}
+.member-chip--pending .member-remove {
+  @apply text-amber-700/70 dark:text-amber-300/70;
 }
 
 .members-empty {
