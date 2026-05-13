@@ -122,8 +122,9 @@ const inLibrary = computed(() => route.path.startsWith('/libraries/'))
 }
 
 .brand {
-  @apply text-lg sm:text-xl font-bold tracking-widest font-headline;
+  @apply text-base sm:text-xl font-bold tracking-wide sm:tracking-widest font-headline;
   @apply text-on-surface dark:text-slate-100;
+  @apply hidden xs:inline;
 }
 
 .header-nav {

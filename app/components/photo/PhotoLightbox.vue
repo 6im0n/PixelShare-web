@@ -254,7 +254,13 @@ const sortedHistory = computed(() => [...props.history].reverse())
 <style scoped>
 /* ── Shell ─────────────────────────────────────────────────── */
 .lightbox {
-  @apply fixed inset-0 z-[100] flex flex-col;
+  @apply fixed inset-0 z-[100] flex flex-col overflow-hidden;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: 100vh;
+  max-height: 100dvh;
 }
 
 .backdrop-blur {

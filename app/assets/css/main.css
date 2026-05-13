@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent horizontal page-scroll on mobile when a child accidentally overflows. */
+html, body { overflow-x: hidden; max-width: 100%; }
+
 /* ── Material Symbols ─────────────────────────────────────────── */
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;

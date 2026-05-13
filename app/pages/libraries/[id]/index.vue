@@ -491,7 +491,7 @@ async function handleInviteMember(payload: InvitedMember) {
 }
 
 .stats-wrap {
-  @apply flex items-center justify-center sm:justify-end gap-3;
+  @apply flex flex-wrap items-center justify-center sm:justify-end gap-3 min-w-0;
 }
 
 .page-title {
@@ -539,11 +539,14 @@ async function handleInviteMember(payload: InvitedMember) {
 
 /* Members field next to add-model button */
 .members-field {
-  @apply flex items-center gap-2 flex-wrap;
+  @apply flex items-center gap-2 flex-wrap min-w-0;
   @apply px-3 py-1.5 rounded-xl;
   @apply bg-slate-100/70 dark:bg-slate-800/60;
   @apply border border-outline-variant/20 dark:border-white/5;
-  max-width: 320px;
+  max-width: 100%;
+}
+@media (min-width: 640px) {
+  .members-field { max-width: 320px; }
 }
 
 .members-label {

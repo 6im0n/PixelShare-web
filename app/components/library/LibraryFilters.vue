@@ -247,7 +247,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .filters-bar {
-  @apply flex items-center gap-2 mb-6 sm:mb-8 pb-1;
+  @apply flex flex-wrap items-center gap-2 mb-6 sm:mb-8 pb-1 min-w-0;
 }
 
 .name-search {
@@ -263,7 +263,7 @@ onBeforeUnmount(() => {
 }
 
 .name-input {
-  @apply bg-transparent outline-none text-sm w-32 sm:w-44;
+  @apply bg-transparent outline-none text-sm w-24 sm:w-44 min-w-0;
   @apply text-on-surface dark:text-slate-100;
   @apply placeholder:text-on-surface-variant/50 dark:placeholder:text-white/30;
 }
