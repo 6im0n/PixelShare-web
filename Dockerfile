@@ -15,6 +15,7 @@ FROM oven/bun:1 AS production
 WORKDIR /app
 
 COPY --from=build /app/.output /app
+COPY --from=build /app/public /app/public
 
 EXPOSE 3000/tcp
 ENTRYPOINT [ "bun", "--bun", "run", "/app/server/index.mjs" ]
