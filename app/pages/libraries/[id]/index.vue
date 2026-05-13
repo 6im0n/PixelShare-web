@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import AddMemberControls, { type PickedMember, type InvitedMember } from '~/components/collection/AddMemberControls.vue'
+import BulkUpload from "~/components/photo/BulkUpload.vue";
 
 definePageMeta({ layout: 'library' })
 
 const route = useRoute()
 const libraryId = route.params.id as string
 
-const { photos, starredPhotos, totalCount, pendingCount, setStars, getPhotoHistory, submitSelection, uploadPhoto, clearMyStars, deletePhoto, fetchPhotos } = useLibraryPhotos(libraryId)
+const { photos, starredPhotos, totalCount, pendingCount, setStars, getPhotoHistory, submitSelection, clearMyStars, deletePhoto, fetchPhotos } = useLibraryPhotos(libraryId)
 const { markViewed, isViewed } = useViewedPhotos()
 const { filterStars, filterNewOnly, filterUnstarred, filterName, sortBy, sortDir, hasActiveFilters, clearAll: clearFilters } = useLibraryFilters()
 
@@ -17,8 +18,8 @@ const filteredPhotos = computed(() => {
     if (filterNewOnly.value   && !(photo.isNew && !isViewed(photo.id))) return false
     if (filterUnstarred.value && photo.myStars > 0)                      return false
     if (filterStars.value !== null && photo.myStars !== filterStars.value) return false
-    if (q && !photo.filename.toLowerCase().includes(q))                  return false
-    return true
+    return !(q && !photo.filename.toLowerCase().includes(q));
+
   })
 
   const dir = sortDir.value === 'asc' ? 1 : -1
@@ -83,59 +84,57 @@ async function handleDeletePhoto(id: string) {
 
 // ── Upload ────────────────────────────────────────────────────────────────
 const { trigger: uploadTrigger } = useUploadTrigger()
-const fileInputRef = ref<HTMLInputElement | null>(null)
-const uploading = ref(false)
-const uploadError = ref<string | null>(null)
+const { signOut } = useAuth()
+const bulkUploadRef = ref<{ pickFiles: () => void; addFiles: (files: File[]) => void } | null>(null)
+const dupePickerRef = ref<HTMLInputElement | null>(null)
+const showUploadPanel = ref(false)
 
-// Duplicate detection
 const duplicateQueue = ref<File[]>([])
 const pendingFiles   = ref<File[]>([])
 const showDuplicateModal = ref(false)
 
 watch(uploadTrigger, () => {
-  fileInputRef.value?.click()
+  showUploadPanel.value = true
+  dupePickerRef.value?.click()
 })
 
-async function handleFiles(e: Event) {
-  const files = Array.from((e.target as HTMLInputElement).files ?? [])
-  if (fileInputRef.value) fileInputRef.value.value = ''
+function handlePicked(e: Event) {
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  if (dupePickerRef.value) dupePickerRef.value.value = ''
   if (!files.length) return
+  routeFiles(files)
+}
 
+function routeFiles(files: File[]) {
   const existingNames = new Set(photos.value.map(p => p.filename))
   const dupes = files.filter(f => existingNames.has(f.name))
   const fresh = files.filter(f => !existingNames.has(f.name))
-
   if (dupes.length > 0) {
     duplicateQueue.value = dupes
     pendingFiles.value   = fresh
     showDuplicateModal.value = true
     return
   }
-  await doUpload(files)
+  bulkUploadRef.value?.addFiles(files)
 }
 
-async function confirmDuplicates(replaceAll: boolean) {
+function confirmDuplicates(replaceAll: boolean) {
   showDuplicateModal.value = false
   const toUpload = replaceAll
     ? [...pendingFiles.value, ...duplicateQueue.value]
     : pendingFiles.value
   duplicateQueue.value = []
   pendingFiles.value   = []
-  if (toUpload.length) await doUpload(toUpload)
+  if (toUpload.length) bulkUploadRef.value?.addFiles(toUpload)
 }
 
-async function doUpload(files: File[]) {
-  uploading.value = true
-  uploadError.value = null
-  try {
-    for (const file of files) {
-      await uploadPhoto(file)
-    }
-  } catch (err: any) {
-    uploadError.value = err?.data?.message ?? err?.message ?? 'Upload failed.'
-  } finally {
-    uploading.value = false
-  }
+async function onUploadComplete(_ids: string[]) {
+  await fetchPhotos()
+}
+
+function onUploadUnauthorized() {
+  signOut({ callbackUrl: '/login' })
 }
 
 // ── Library meta ──────────────────────────────────────────────────────────
@@ -247,14 +246,14 @@ async function handleInviteMember(payload: InvitedMember) {
 </script>
 
 <template>
-  <!-- Hidden file input for upload -->
+  <!-- Hidden picker for duplicate-detected file flow -->
   <input
-    ref="fileInputRef"
+    ref="dupePickerRef"
     type="file"
     accept="image/*"
     multiple
     style="display:none"
-    @change="handleFiles"
+    @change="handlePicked"
   />
 
   <!-- Duplicate confirmation modal -->
@@ -292,17 +291,29 @@ async function handleInviteMember(payload: InvitedMember) {
     </div>
   </Transition>
 
-  <!-- Upload feedback -->
-  <Transition name="lightbox">
-    <div v-if="uploadError || uploading" class="member-toast">
-      <UiAlert :variant="uploading ? 'info' : 'error'">
-        {{ uploading ? 'Uploading photos…' : uploadError }}
-      </UiAlert>
-      <button v-if="!uploading" class="toast-close" aria-label="Dismiss" @click="uploadError = null">
-        <span class="material-symbols-outlined" style="font-size:16px">close</span>
-      </button>
-    </div>
-  </Transition>
+  <!-- Bulk upload panel -->
+  <section v-if="showUploadPanel" class="upload-panel">
+    <header class="upload-panel-head">
+      <div>
+        <h2 class="upload-panel-title">Upload photos</h2>
+        <p class="upload-panel-sub">Queued in parallel · server-side processing.</p>
+      </div>
+      <UiButton
+        variant="ghost"
+        size="sm"
+        icon="close"
+        icon-only
+        aria-label="Close upload panel"
+        @click="showUploadPanel = false"
+      />
+    </header>
+    <BulkUpload
+      ref="bulkUploadRef"
+      :library-id="libraryId"
+      @complete="onUploadComplete"
+      @unauthorized="onUploadUnauthorized"
+    />
+  </section>
 
   <!-- Page header -->
   <header class="page-header">
@@ -647,5 +658,23 @@ async function handleInviteMember(payload: InvitedMember) {
 
 .confirm-actions {
   @apply flex justify-end gap-2 pt-1;
+}
+
+/* Upload panel */
+.upload-panel {
+  @apply mb-6 p-4 sm:p-5 rounded-2xl;
+  @apply bg-white/70 dark:bg-slate-900/50;
+  @apply border border-outline-variant/20 dark:border-white/5;
+  @apply flex flex-col gap-4;
+}
+.upload-panel-head {
+  @apply flex items-start justify-between gap-3;
+}
+.upload-panel-title {
+  @apply text-base sm:text-lg font-headline font-bold;
+  @apply text-on-surface dark:text-slate-100;
+}
+.upload-panel-sub {
+  @apply text-xs text-on-surface-variant dark:text-slate-400 mt-0.5;
 }
 </style>
