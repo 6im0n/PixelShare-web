@@ -72,7 +72,7 @@ export function useLibraryPhotos(libraryId: string) {
     error.value = null
     try {
       const [list, _libStars] = await Promise.all([
-        api.get<ApiPhoto[]>(`/libraries/${libraryId}/photos`),
+        api.get<ApiPhoto[]>(`/libraries/${libraryId}/photos`, { query: { limit: 5000 } }),
         api
           .get<Array<{ photoId: string; userId: string; value: number; userRole: string }>>(
             `/libraries/${libraryId}/stars`,
